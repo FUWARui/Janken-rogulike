@@ -2,15 +2,16 @@
    🧠 じゃんけんローグライク main.js
 ========================================= */
 
-let playerLife = 10;
-let playerMaxLife = 10; 
+let playerLife = 10;   // ★前回の変更を反映
+let playerMaxLife = 10; // ★前回の変更を反映
 let enemyLife = 0;
 let enemyMaxLife = 0;  
 
 let playerDamage = 1;
 let damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
 
-let turnFlags = { healOnKill: null, doubleGoldOnKill: false };
+// ★修正：癒し系のフラグをオブジェクト化、ゴールド倍率を追加、ロウワーのフラグを追加
+let turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
 let durationBuffs = { bonusDamage: 0, turnsLeft: 0 };
 
 let currentStage = 1; 
@@ -38,6 +39,14 @@ let currentShopBuff = null;
 let turnBaseAttackBonus = 0; 
 let lockProbability = false; 
 let poisonCountdown = 0;     
+let poisonDamage = 50;
+
+// ★新規追加：敵の虚弱（デバフ）管理
+let enemyWeakCountdown = 0;
+let enemyWeakMultiplier = 1.2;
+
+// ★新規追加：訓練場の状態管理
+let trainingCount = 3;
 
 const stageData = new Array(
     { hp: 5,  probPattern: new Array(80, 10, 10) },
@@ -56,29 +65,36 @@ const stageData = new Array(
 let baseEnemyProb = {};
 let enemyProb = {};
 
+// ★修正：アップグレード費用(upCost)と強化後の説明(upDesc)を追加
 const cardTemplates = {
-    "グーUP": { name: "最初は、、、", type: "グー", desc: "敵の✊+10%", isRare: false, icon: "✊", combo: "rock", sortOrder: 1 },
-    "ビンタ": { name: "ビンタ", type: "ビンタ", desc: "✋で勝った時\nダメージ3倍", isRare: false, icon: "👋", combo: "rock", sortOrder: 3 },
-    "チョキUP": { name: "ハイチーズ", type: "チョキ", desc: "敵の✌️+10%", isRare: false, icon: "✌️", combo: "scissors", sortOrder: 1 },
-    "グーパン": { name: "グーパン", type: "グーパン", desc: "✊で勝った時\nダメージ3倍", isRare: false, icon: "🥊", combo: "scissors", sortOrder: 3 },
-    "パーUP": { name: "ヘッドイズ", type: "パー", desc: "敵の✋+10%", isRare: false, icon: "✋", combo: "paper", sortOrder: 1 },
-    "目つぶし": { name: "目つぶし", type: "目つぶし", desc: "✌️で勝った時\nダメージ3倍", isRare: false, icon: "👀", combo: "paper", sortOrder: 3 },
-    "リドロー": { name: "リドロー", type: "リドロー", desc: "敵のランダムな手+15%\nカードを2枚引く", isRare: false, icon: "🔄", sortOrder: 2 },
-    "ダブル": { name: "ダブルハンド", type: "ダブル", desc: "次の攻撃ダメージ2倍", isRare: false, icon: "⚔️", sortOrder: 3 },
+    "グーUP": { name: "最初は、、、", type: "グー", desc: "敵の✊+10%", upDesc: "敵の✊+15%", isRare: false, icon: "✊", combo: "rock", sortOrder: 1, upCost: 20 },
+    "チョキUP": { name: "ハイチーズ", type: "チョキ", desc: "敵の✌️+10%", upDesc: "敵の✌️+15%", isRare: false, icon: "✌️", combo: "scissors", sortOrder: 1, upCost: 20 },
+    "パーUP": { name: "ヘッドイズ", type: "パー", desc: "敵の✋+10%", upDesc: "敵の✋+15%", isRare: false, icon: "✋", combo: "paper", sortOrder: 1, upCost: 20 },
     
-    "癒しグー": { name: "癒しの拳", type: "癒しグー", desc: "このターン✊で\n敵を倒すとライフ+1", isRare: true, icon: "💖", combo: "rock", sortOrder: 5 },
-    "癒しチョキ": { name: "癒しの鋏", type: "癒しチョキ", desc: "このターン✌️で\n敵を倒すとライフ+1", isRare: true, icon: "💖", combo: "scissors", sortOrder: 5 },
-    "癒しパー": { name: "癒しの掌", type: "癒しパー", desc: "このターン✋で\n敵を倒すとライフ+1", isRare: true, icon: "💖", combo: "paper", sortOrder: 5 },
-    "ハイロー": { name: "ハイ＆ロー", type: "ハイロー", desc: "このターン敵を\n倒すと獲得ロー2倍", isRare: true, icon: "🎰", sortOrder: 5 },
-    "カットボーン": { name: "ボーンカッター", type: "カットボーン", desc: "自傷ダメ(最低1)を受け\n2ターン基礎ダメ+3", isRare: true, icon: "🩸", sortOrder: 5 },
+    "グーパン": { name: "グーパン", type: "グーパン", desc: "✊で勝った時\nダメージ3倍", upDesc: "✊で勝った時\nダメージ3.5倍", isRare: false, icon: "🥊", combo: "scissors", sortOrder: 3, upCost: 30 },
+    "ビンタ": { name: "ビンタ", type: "ビンタ", desc: "✋で勝った時\nダメージ3倍", upDesc: "✋で勝った時\nダメージ3.5倍", isRare: false, icon: "👋", combo: "rock", sortOrder: 3, upCost: 30 },
+    "目つぶし": { name: "目つぶし", type: "目つぶし", desc: "✌️で勝った時\nダメージ3倍", upDesc: "✌️で勝った時\nダメージ3.5倍", isRare: false, icon: "👀", combo: "paper", sortOrder: 3, upCost: 30 },
+    
+    "リドロー": { name: "リドロー", type: "リドロー", desc: "敵ランダム手+15%\nカードを2枚引く", upDesc: "敵ランダム手+15%\nカードを3枚引く", isRare: false, icon: "🔄", sortOrder: 2, upCost: 30 },
+    "ダブル": { name: "ダブルハンド", type: "ダブル", desc: "次の攻撃ダメージ2倍", upDesc: "次の攻撃ダメージ2.5倍", isRare: false, icon: "⚔️", sortOrder: 3, upCost: 30 },
+    
+    "癒しグー": { name: "癒しの拳", type: "癒しグー", desc: "✊で倒すと\nライフ+1", upDesc: "✊で倒すと\nライフ+2", isRare: true, icon: "💖", combo: "rock", sortOrder: 5, upCost: 50 },
+    "癒しチョキ": { name: "癒しの鋏", type: "癒しチョキ", desc: "✌️で倒すと\nライフ+1", upDesc: "✌️で倒すと\nライフ+2", isRare: true, icon: "💖", combo: "scissors", sortOrder: 5, upCost: 50 },
+    "癒しパー": { name: "癒しの掌", type: "癒しパー", desc: "✋で倒すと\nライフ+1", upDesc: "✋で倒すと\nライフ+2", isRare: true, icon: "💖", combo: "paper", sortOrder: 5, upCost: 50 },
+    "ハイロー": { name: "ハイ＆ロー", type: "ハイロー", desc: "このターン敵を\n倒すと獲得ロー2倍", upDesc: "このターン敵を\n倒すと獲得ロー4倍", isRare: true, icon: "🎰", sortOrder: 5, upCost: 50 },
+    "カットボーン": { name: "ボーンカッター", type: "カットボーン", desc: "自傷ダメ(1)を受け\n2ターン基礎ダメ+3", upDesc: "自傷ダメ(1)を受け\n2ターン基礎ダメ+5", isRare: true, icon: "🩸", sortOrder: 5, upCost: 50 },
 
-    "グパ": { name: "奥義: グパ", type: "グパ", desc: "✊と✋を同時に出す\n(使用後ターン終了)", isRare: true, icon: "✊✋", sortOrder: 4 },
-    "グチョ": { name: "奥義: グチョ", type: "グチョ", desc: "✊と✌️を同時に出す\n(使用後ターン終了)", isRare: true, icon: "✊✌️", sortOrder: 4 },
-    "チョパ": { name: "奥義: チョパ", type: "チョパ", desc: "✌️と✋を同時に出す\n(使用後ターン終了)", isRare: true, icon: "✌️✋", sortOrder: 4 },
-    "救済": { name: "救済", type: "救済", desc: "敵の手のどれか1つが\n100%に固定", isRare: true, icon: "👼", sortOrder: 4 },
+    "リミットブレイク": { name: "リミットブレイク", type: "リミットブレイク", desc: "手札を全捨て。捨てた枚数×2を基本攻撃力に。", upDesc: "手札を全捨て。捨てた枚数×4を基本攻撃力に。", isRare: true, icon: "💥", sortOrder: 4, upCost: 50 },
+    "崖っぷち": { name: "崖っぷち", type: "崖っぷち", desc: "敵に4ターン後50ダメ。\nバトル中確率操作不可", upDesc: "敵に4ターン後100ダメ。\nバトル中確率操作不可", isRare: true, icon: "☠️", sortOrder: 4, upCost: 50 },
+    
+    // ★新カード：ロウワー
+    "ロウワー": { name: "ロウワー", type: "ロウワー", desc: "ダメージを与えると\n敵に3ターン虚弱(1.2倍)", upDesc: "ダメージを与えると\n敵に3ターン虚弱(1.5倍)", isRare: true, icon: "📉", sortOrder: 4, upCost: 50 },
 
-    "リミットブレイク": { name: "リミットブレイク", type: "リミットブレイク", desc: "手札を全捨て。捨てた枚数×2をこのターンの基本攻撃力に足す。", isRare: true, icon: "💥", sortOrder: 4 },
-    "崖っぷち": { name: "崖っぷち", type: "崖っぷち", desc: "敵に4ターン後50ダメージ。バトル中確率操作不可。", isRare: true, icon: "☠️", sortOrder: 4 }
+    // 強化不可（upCost: -1）
+    "グパ": { name: "奥義: グパ", type: "グパ", desc: "✊と✋を同時に出す\n(使用後ターン終了)", isRare: true, icon: "✊✋", sortOrder: 4, upCost: -1 },
+    "グチョ": { name: "奥義: グチョ", type: "グチョ", desc: "✊と✌️を同時に出す\n(使用後ターン終了)", isRare: true, icon: "✊✌️", sortOrder: 4, upCost: -1 },
+    "チョパ": { name: "奥義: チョパ", type: "チョパ", desc: "✌️と✋を同時に出す\n(使用後ターン終了)", isRare: true, icon: "✌️✋", sortOrder: 4, upCost: -1 },
+    "救済": { name: "救済", type: "救済", desc: "敵の手のどれか1つが\n100%に固定", isRare: true, icon: "👼", sortOrder: 4, upCost: -1 }
 };
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -103,9 +119,6 @@ const se = {
     shuffle: () => { playSynthSound('sawtooth', 300.00, 0.2, 0.1); }
 };
 
-// =========================================
-// UIレイアウト（左サイドバー＆中央HPボード）
-// =========================================
 let statusBar = document.querySelector('.status-bar');
 
 let oldLifeDisplay = document.getElementById("lifeDisplay");
@@ -114,7 +127,7 @@ if(oldLifeDisplay) oldLifeDisplay.style.display = "none";
 let sideBar = document.createElement('div');
 sideBar.id = "sideBar";
 sideBar.style.position = "absolute";
-sideBar.style.left = "30px";
+sideBar.style.left = "10px";
 sideBar.style.top = "150px"; 
 sideBar.style.display = "flex";
 sideBar.style.flexDirection = "column";
@@ -159,9 +172,25 @@ hpInfoDiv.innerHTML = `
 `;
 statusBar.parentNode.insertBefore(hpInfoDiv, statusBar.nextSibling);
 
-// =========================================
-// 山札・捨て札確認モーダル（閲覧専用）
-// =========================================
+// ★新規追加：訓練場UIの動的生成
+let trainingScreen = document.createElement('div');
+trainingScreen.id = "trainingScreen";
+trainingScreen.style.display = "none";
+trainingScreen.style.paddingTop = "10px";
+trainingScreen.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2 style="font-size: 2em; margin: 0 !important; text-align: left;">🏕️ 訓練場</h2>
+        <div style="font-size: 1.5em; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;">💰 所持金: <span id="trainingGoldDisplay">0</span> ロー</div>
+    </div>
+    <p style="font-size: 1.2em;">ローを支払ってカードをアップグレードできる。 <span style="color:#e74c3c;font-weight:bold;">残り回数: <span id="trainingCountDisplay">3</span> 回</span></p>
+    <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+        <div id="trainingCards" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; max-height: 400px; overflow-y: auto; padding: 10px;"></div>
+    </div>
+    <button class="action-btn skip-btn" style="margin-top: 15px; font-size: 1.2em !important; padding: 10px 30px !important;" onclick="leaveTraining()">訓練を終える ➡️</button>
+`;
+document.querySelector('.game-container').appendChild(trainingScreen);
+
+
 function openViewModal(type) {
     let modal = document.getElementById("viewModal");
     let title = document.getElementById("viewModalTitle");
@@ -192,10 +221,11 @@ function openViewModal(type) {
         if (card.combo) { cardDiv.classList.add("combo-" + card.combo); }
         cardDiv.style.setProperty('--rot', '0deg'); cardDiv.style.setProperty('--ty', '0px');
         
-        let safeName = card.name || "不明";
+        let safeName = (card.isUpgraded ? "✨" : "") + (card.name || "不明");
+        let safeDesc = card.isUpgraded ? (card.upDesc || card.desc) : card.desc;
         let safeIcon = card.icon || "❓";
-        let safeDesc = card.desc || "";
-        cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${safeIcon}</div><div class="card-desc">${safeDesc}</div>`;
+        
+        cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${safeIcon}</div><div class="card-desc" style="font-size:0.7em;">${safeDesc}</div>`;
         listArea.appendChild(cardDiv);
     });
 }
@@ -236,43 +266,27 @@ function updateGoldDisplay() {
     if(shopDisp) { shopDisp.innerText = `💰 所持金: ${playerGold} ロー`; }
 }
 
-// =========================================
-// ★修正：初期デッキを固定の構成に変更
-// =========================================
 function initDeck() {
     deck = new Array(); discardPile = new Array();
     
-    // 最初は、、、（グーUP） 各7枚
     for(let i=0; i<7; i++) { deck.push({ ...cardTemplates["グーUP"] }); }
-    // ハイチーズ（チョキUP） 各7枚
     for(let i=0; i<7; i++) { deck.push({ ...cardTemplates["チョキUP"] }); }
-    // ヘッドイズ（パーUP） 各7枚
     for(let i=0; i<7; i++) { deck.push({ ...cardTemplates["パーUP"] }); }
     
-    // リドロー 4枚
     for(let i=0; i<4; i++) { deck.push({ ...cardTemplates["リドロー"] }); }
-    // ダブルハンド（ダブル） 4枚
     for(let i=0; i<4; i++) { deck.push({ ...cardTemplates["ダブル"] }); }
 
-    // グーパン 2枚
     for(let i=0; i<2; i++) { deck.push({ ...cardTemplates["グーパン"] }); }
-    // ビンタ 2枚
     for(let i=0; i<2; i++) { deck.push({ ...cardTemplates["ビンタ"] }); }
-    // 目つぶし 2枚
     for(let i=0; i<2; i++) { deck.push({ ...cardTemplates["目つぶし"] }); }
     
-    // 奥義＆救済 各1枚
     deck.push({ ...cardTemplates["グチョ"] });
     deck.push({ ...cardTemplates["グパ"] });
     deck.push({ ...cardTemplates["チョパ"] });
     deck.push({ ...cardTemplates["救済"] });
-    
-    // ※癒し系、ハイロー、カットボーン、新カード（リミットブレイク等）は初期デッキから除外
-    // これらはショップや戦闘報酬でのみ手に入ります！
 
     shuffleDeck();
 }
-// =========================================
 
 function shuffleDeck() {
     for (let i = deck.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); let temp = deck[i]; deck[i] = deck[j]; deck[j] = temp; }
@@ -312,11 +326,11 @@ function renderHand() {
         cardDiv.style.setProperty('--rot', rotationAngle + 'deg'); cardDiv.style.setProperty('--ty', yOffset + 'px');
         if (index !== 0) { let overlap = totalCards > 5 ? -50 : -30; cardDiv.style.marginLeft = overlap + "px"; }
         
-        let safeName = card.name || "不明";
+        let safeName = (card.isUpgraded ? "✨" : "") + (card.name || "不明");
+        let safeDesc = card.isUpgraded ? (card.upDesc || card.desc) : card.desc;
         let safeIcon = card.icon || "❓";
-        let safeDesc = card.desc || "";
-        cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${safeIcon}</div><div class="card-desc">${safeDesc}</div>`;
         
+        cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${safeIcon}</div><div class="card-desc" style="font-size:0.7em;">${safeDesc}</div>`;
         cardDiv.onclick = function() { useCard(index); }; handArea.appendChild(cardDiv);
     });
 }
@@ -338,6 +352,16 @@ function spawnDamageEffect(damageAmount) {
 
 function updateTurnDisplay() {
     let displayElement = document.getElementById("turnDisplay");
+    
+    // 虚弱のターン数も画面に出す
+    if (enemyWeakCountdown > 0) {
+        displayElement.style.display = "inline-block";
+        displayElement.innerText = `📉 敵は虚弱状態 (残り${enemyWeakCountdown}T)`;
+        displayElement.style.backgroundColor = "#8e44ad";
+        displayElement.style.color = "#fff";
+        return;
+    }
+
     if (currentEnemyType !== "elite" && currentEnemyType !== "boss") { displayElement.style.display = "none"; return; }
     displayElement.style.display = "inline-block";
     let turnsLeft = 10 - turnCount;
@@ -358,6 +382,7 @@ function showRewardScreen() {
     document.getElementById("battleScreen").style.display = "none";
     document.getElementById("routeScreen").style.display = "none";
     document.getElementById("shopScreen").style.display = "none";
+    document.getElementById("trainingScreen").style.display = "none";
     document.getElementById("eliteRewardScreen").style.display = "none";
     document.getElementById("rewardScreen").style.display = "block";
     
@@ -381,7 +406,7 @@ function showRewardScreen() {
         cardDiv.className = card.isRare ? "card rare" : "card";
         if (card.combo) { cardDiv.classList.add("combo-" + card.combo); }
         cardDiv.style.setProperty('--rot', '0deg'); cardDiv.style.setProperty('--ty', '0px');
-        cardDiv.innerHTML = `<div class="card-name">${card.name}</div><div class="card-icon">${card.icon}</div><div class="card-desc">${card.desc}</div>`;
+        cardDiv.innerHTML = `<div class="card-name">${card.name}</div><div class="card-icon">${card.icon}</div><div class="card-desc" style="font-size:0.7em;">${card.desc}</div>`;
         cardDiv.onclick = function() {
             se.card(); deck.push({ ...card }); 
             document.getElementById("rewardScreen").style.display = "none"; advanceStage(); 
@@ -408,6 +433,87 @@ function chooseEliteBuff(buffType) {
     document.getElementById("eliteRewardScreen").style.display = "none";
     showRewardScreen(); 
 }
+
+// =========================================
+// ★新規追加：訓練場システム
+// =========================================
+function generateTrainingCamp() {
+
+    trainingCount = 3;
+    document.getElementById("trainingCountDisplay").innerText = trainingCount;
+    document.getElementById("trainingGoldDisplay").innerText = playerGold;
+    
+    let listArea = document.getElementById("trainingCards");
+    listArea.innerHTML = "";
+    
+    deck.sort((a, b) => { if (a.sortOrder === b.sortOrder) { return a.name.localeCompare(b.name, 'ja'); } return a.sortOrder - b.sortOrder; });
+    
+    deck.forEach((card) => {
+        let cardWrapper = document.createElement("div");
+        cardWrapper.className = "shop-card-wrapper";
+        cardWrapper.style.margin = "5px";
+        
+        let cardDiv = document.createElement("div");
+        cardDiv.className = card.isRare ? "card rare view-only-card" : "card view-only-card";
+        if (card.combo) { cardDiv.classList.add("combo-" + card.combo); }
+        cardDiv.style.setProperty('--rot', '0deg'); cardDiv.style.setProperty('--ty', '0px');
+        
+        let safeName = (card.isUpgraded ? "✨" : "") + (card.name || "不明");
+        let safeDesc = card.isUpgraded ? (card.upDesc || card.desc) : card.desc;
+        let safeIcon = card.icon || "❓";
+        cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${safeIcon}</div><div class="card-desc" style="font-size:0.7em;">${safeDesc}</div>`;
+        
+        let upBtn = document.createElement("button");
+        upBtn.className = "action-btn";
+        upBtn.style.fontSize = "0.9em"; upBtn.style.padding = "5px 15px"; upBtn.style.margin = "8px 0 0 0";
+        
+        if (card.isUpgraded) {
+            upBtn.innerText = "強化済";
+            upBtn.disabled = true;
+            upBtn.style.backgroundColor = "#2ecc71";
+        } else if (card.upCost < 0) {
+            upBtn.innerText = "強化不可";
+            upBtn.disabled = true;
+            upBtn.style.backgroundColor = "#7f8c8d";
+        } else {
+            upBtn.innerText = `強化(${card.upCost}ﾛｰ)`;
+            upBtn.onclick = function() {
+                if (trainingCount <= 0) {
+                    alert("強化回数の上限（3回）に達しています！");
+                    return;
+                }
+                if (playerGold >= card.upCost) {
+                    playerGold -= card.upCost;
+                    trainingCount--;
+                    card.isUpgraded = true;
+                    se.win();
+                    
+                    document.getElementById("trainingCountDisplay").innerText = trainingCount;
+                    document.getElementById("trainingGoldDisplay").innerText = playerGold;
+                    updateGoldDisplay();
+                    
+                    upBtn.innerText = "強化済";
+                    upBtn.disabled = true;
+                    upBtn.style.backgroundColor = "#2ecc71";
+                    cardDiv.querySelector('.card-name').innerText = "✨" + card.name;
+                    cardDiv.querySelector('.card-desc').innerText = card.upDesc || card.desc;
+                } else {
+                    se.lose(); alert("ローが足りない！");
+                }
+            };
+        }
+        cardWrapper.appendChild(cardDiv);
+        cardWrapper.appendChild(upBtn);
+        listArea.appendChild(cardWrapper);
+    });
+}
+
+function leaveTraining() {
+    document.getElementById("trainingScreen").style.display = "none";
+
+    advanceStage();
+}
+// =========================================
 
 function generateShop() {
     removeCount = 0; currentRemoveCost = 20;
@@ -438,7 +544,7 @@ function generateShop() {
         cardDiv.className = card.isRare ? "card rare" : "card";
         if (card.combo) { cardDiv.classList.add("combo-" + card.combo); }
         cardDiv.style.setProperty('--rot', '0deg'); cardDiv.style.setProperty('--ty', '0px');
-        cardDiv.innerHTML = `<div class="card-name">${card.name}</div><div class="card-icon">${card.icon}</div><div class="card-desc">${card.desc}</div>`;
+        cardDiv.innerHTML = `<div class="card-name">${card.name}</div><div class="card-icon">${card.icon}</div><div class="card-desc" style="font-size:0.7em;">${card.desc}</div>`;
         
         let buyBtn = document.createElement("button");
         buyBtn.innerText = `${cost} ロー`;
@@ -504,9 +610,13 @@ function openRemoveModal() {
         cardDiv.className = card.isRare ? "card rare" : "card";
         if (card.combo) { cardDiv.classList.add("combo-" + card.combo); }
         cardDiv.style.setProperty('--rot', '0deg'); cardDiv.style.setProperty('--ty', '0px');
-        cardDiv.innerHTML = `<div class="card-name">${card.name}</div><div class="card-icon">${card.icon}</div><div class="card-desc">${card.desc}</div>`;
+        
+        let safeName = (card.isUpgraded ? "✨" : "") + (card.name || "不明");
+        let safeDesc = card.isUpgraded ? (card.upDesc || card.desc) : card.desc;
+        cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${card.icon}</div><div class="card-desc" style="font-size:0.7em;">${safeDesc}</div>`;
+        
         cardDiv.onclick = function() {
-            if (confirm(`【${currentRemoveCost}ロー】支払って「${card.name}」を完全に削除しますか？`)) {
+            if (confirm(`【${currentRemoveCost}ロー】支払って「${safeName}」を完全に削除しますか？`)) {
                 playerGold -= currentRemoveCost; deck.splice(index, 1); 
                 removeCount++; currentRemoveCost += 20; 
                 se.bomb(); updateGoldDisplay(); updateDeckUI();
@@ -534,6 +644,7 @@ function startEncounter(type) {
     document.getElementById("shopScreen").style.display = "none";
     document.getElementById("rewardScreen").style.display = "none";
     document.getElementById("eliteRewardScreen").style.display = "none";
+    document.getElementById("trainingScreen").style.display = "none"; // 訓練場も隠す
     document.getElementById("battleScreen").style.display = "block";
     
     let data = stageData.at(currentStage - 1);
@@ -542,13 +653,16 @@ function startEncounter(type) {
     enemyMaxLife = enemyLife; 
     
     damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
-    turnFlags = { healOnKill: null, doubleGoldOnKill: false };
+    
+    // ★フラグ初期化（虚弱やロウワーも）
+    turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
     durationBuffs = { bonusDamage: 0, turnsLeft: 0 };
     turnCount = 0; 
     
     turnBaseAttackBonus = 0;
     lockProbability = false;
     poisonCountdown = 0;
+    enemyWeakCountdown = 0;
     
     playedCardsThisTurn = new Array();
     updateHistoryUI();
@@ -570,13 +684,25 @@ function advanceStage() {
     deck = deck.concat(hand).concat(discardPile);
     hand = new Array(); discardPile = new Array(); shuffleDeck();
 
-    if (currentStage === 5 || currentStage === 10) {
+    if (currentStage === 11) { 
+        startEncounter("boss"); drawCards(initialDrawCount); 
+    } 
+    // ステージ3, 6, 9のバトルをクリアした直後（Stage 4, 7, 10）に訓練場を出す
+    else if (currentStage === 4 || currentStage === 7 || currentStage === 10) {
+        document.getElementById("battleScreen").style.display = "none";
+        document.getElementById("routeScreen").style.display = "none";
+        document.getElementById("rewardScreen").style.display = "none";
+        document.getElementById("trainingScreen").style.display = "block";
+        document.getElementById("stageDisplay").innerText = "🏕️ 訓練場 (Stage " + currentStage + ")";
+        generateTrainingCamp();
+    } 
+    // 分岐画面はStage 5に出す
+    else if (currentStage === 5) {
         document.getElementById("battleScreen").style.display = "none";
         document.getElementById("routeScreen").style.display = "block";
         document.getElementById("stageDisplay").innerText = "🗺️ 分岐 (Stage " + currentStage + ")";
-    } else if (currentStage === 11) { 
-        startEncounter("boss"); drawCards(initialDrawCount); 
-    } else { 
+    } 
+    else { 
         startEncounter("normal"); drawCards(initialDrawCount); 
     }
 }
@@ -642,7 +768,9 @@ function useCard(index) {
             se.lose(); alert("これ以上血を流すと死んでしまう！"); return; 
         }
         se.bomb(); playerLife -= selfDmg; updateLifeDisplay();
-        durationBuffs.bonusDamage += 3; durationBuffs.turnsLeft = 2; 
+        // ★修正：アップグレード効果反映
+        durationBuffs.bonusDamage += card.isUpgraded ? 5 : 3; 
+        durationBuffs.turnsLeft = 2; 
         playedCardsThisTurn.push(card); updateHistoryUI();
         hand.splice(index, 1); discardPile.push(card); updateDeckUI();
         updateDamagePreview(); renderHand();
@@ -657,37 +785,46 @@ function useCard(index) {
 
     if (card.type === "グパ" || card.type === "グチョ" || card.type === "チョパ") { renderHand(); playGame(card.type); return; }
     
+    // ★以下、各カードのアップグレード（card.isUpgraded）での効果分岐
     if (card.type === "リドロー") {
         let handsArray = new Array("グー", "チョキ", "パー"); let randomTarget = handsArray.at(Math.floor(Math.random() * handsArray.length));
-        changeProb(randomTarget, 15); updateProbDisplay(); drawCards(2); 
+        changeProb(randomTarget, 15); updateProbDisplay(); drawCards(card.isUpgraded ? 3 : 2); 
     } else if (card.type === "救済") {
         let handsArray = new Array("グー", "チョキ", "パー"); let target = handsArray.at(Math.floor(Math.random() * handsArray.length));
         enemyProb["グー"] = 0; enemyProb["チョキ"] = 0; enemyProb["パー"] = 0; enemyProb[target] = 100; updateProbDisplay();
-    } else if (card.type === "ダブル") { damageMultipliers.all *= 2; } 
-    else if (card.type === "グーパン") { damageMultipliers["グー"] *= 3; } 
-    else if (card.type === "目つぶし") { damageMultipliers["チョキ"] *= 3; } 
-    else if (card.type === "ビンタ") { damageMultipliers["パー"] *= 3; } 
-    else if (card.type === "癒しグー") { turnFlags.healOnKill = "グー"; } 
-    else if (card.type === "癒しチョキ") { turnFlags.healOnKill = "チョキ"; } 
-    else if (card.type === "癒しパー") { turnFlags.healOnKill = "パー"; } 
-    else if (card.type === "ハイロー") { turnFlags.doubleGoldOnKill = true; } 
+    } else if (card.type === "ダブル") { damageMultipliers.all *= card.isUpgraded ? 2.5 : 2; } 
+    else if (card.type === "グーパン") { damageMultipliers["グー"] *= card.isUpgraded ? 3.5 : 3; } 
+    else if (card.type === "目つぶし") { damageMultipliers["チョキ"] *= card.isUpgraded ? 3.5 : 3; } 
+    else if (card.type === "ビンタ") { damageMultipliers["パー"] *= card.isUpgraded ? 3.5 : 3; } 
+    else if (card.type === "癒しグー") { turnFlags.healOnKill = { hand: "グー", amount: card.isUpgraded ? 2 : 1 }; } 
+    else if (card.type === "癒しチョキ") { turnFlags.healOnKill = { hand: "チョキ", amount: card.isUpgraded ? 2 : 1 }; } 
+    else if (card.type === "癒しパー") { turnFlags.healOnKill = { hand: "パー", amount: card.isUpgraded ? 2 : 1 }; } 
+    else if (card.type === "ハイロー") { turnFlags.goldMultiplier = card.isUpgraded ? 4 : 2; } 
     
     else if (card.type === "リミットブレイク") {
         let discardCount = hand.length;
-        turnBaseAttackBonus += (discardCount * 2);
+        let addAtk = discardCount * (card.isUpgraded ? 4 : 2);
+        turnBaseAttackBonus += addAtk;
         discardPile.push(...hand);
         hand = [];
         se.bomb();
-        document.getElementById("resultText").innerText = `💥 リミットブレイク！${discardCount}枚捨てて基礎攻撃力が+${discardCount * 2}された！`;
+        document.getElementById("resultText").innerText = `💥 リミットブレイク！${discardCount}枚捨てて基礎攻撃力が+${addAtk}された！`;
     } 
     else if (card.type === "崖っぷち") {
         poisonCountdown = 4; 
+        poisonDamage = card.isUpgraded ? 100 : 50;
         lockProbability = true; 
         se.bomb();
-        document.getElementById("resultText").innerText = `☠️ 崖っぷち！4ターン後に50ダメージ。確率操作が封印された！`;
+        document.getElementById("resultText").innerText = `☠️ 崖っぷち！4ターン後に${poisonDamage}ダメージ。確率操作が封印された！`;
     } 
-
-    else { changeProb(card.type, 10); updateProbDisplay(); }
+    else if (card.type === "ロウワー") {
+        turnFlags.lowerUsed = true;
+        turnFlags.lowerMultiplier = card.isUpgraded ? 1.5 : 1.2;
+        se.bomb();
+        document.getElementById("resultText").innerText = `📉 ロウワー準備完了！このターン攻撃を当てれば敵を「虚弱」にできる！`;
+    }
+    // 確率アップ系（共通処理）
+    else { changeProb(card.type, card.isUpgraded ? 15 : 10); updateProbDisplay(); }
     
     updateDamagePreview(); renderHand();
 }
@@ -698,7 +835,7 @@ function decideEnemyHand() {
 }
 
 function playGame(playerHand) {
-    turnCount++; updateTurnDisplay();
+    turnCount++; 
     let container = document.querySelector('.game-container'); let statusBar = document.querySelector('.status-bar');
 
     if ((currentEnemyType === "elite" || currentEnemyType === "boss") && turnCount >= 10) {
@@ -719,10 +856,23 @@ function playGame(playerHand) {
         let finalDamage = (playerDamage + durationBuffs.bonusDamage + turnBaseAttackBonus) * damageMultipliers.all; 
         if (playerHand === "グー") finalDamage *= damageMultipliers["グー"]; else if (playerHand === "チョキ") finalDamage *= damageMultipliers["チョキ"]; else if (playerHand === "パー") finalDamage *= damageMultipliers["パー"];
         
+        // ★新規追加：虚弱（ロウワー）のダメージ増加計算
+        if (enemyWeakCountdown > 0) {
+            finalDamage = Math.floor(finalDamage * enemyWeakMultiplier);
+        }
+
         if (finalDamage > enemyLife) { overkillAmount = finalDamage - enemyLife; }
         enemyLife -= finalDamage;
         se.win(); statusBar.classList.add('status-bar-win'); setTimeout(() => statusBar.classList.remove('status-bar-win'), 1000); 
         spawnDamageEffect(finalDamage); showPopup("win", "WIN!!", detailText); 
+
+        // ★新規追加：ロウワーの効果発動
+        if (turnFlags.lowerUsed) {
+            enemyWeakCountdown = 3;
+            enemyWeakMultiplier = turnFlags.lowerMultiplier;
+            alert(`📉 ロウワー成功！敵は3ターンの間「虚弱（被ダメ${enemyWeakMultiplier}倍）」になった！`);
+        }
+
     } else if (isTie === true) {
         se.tie(); showPopup("tie", "DRAW", detailText);
     } else {
@@ -731,16 +881,25 @@ function playGame(playerHand) {
 
     updateLifeDisplay();
 
+    // 崖っぷちのカウントダウン
     if (poisonCountdown > 0 && enemyLife > 0) {
         poisonCountdown--;
         if (poisonCountdown === 0) {
-            enemyLife -= 50;
+            enemyLife -= poisonDamage;
             se.bomb();
-            spawnDamageEffect(50);
-            alert("☠️ 崖っぷちの毒が発動！敵に50ダメージ！");
+            spawnDamageEffect(poisonDamage);
+            alert(`☠️ 崖っぷちの毒が発動！敵に${poisonDamage}ダメージ！`);
             updateLifeDisplay();
         } else {
             document.getElementById("resultText").innerText = `☠️ 毒発動まであと ${poisonCountdown} ターン...\n` + document.getElementById("resultText").innerText;
+        }
+    }
+
+    // ★新規追加：虚弱のカウントダウン
+    if (enemyWeakCountdown > 0) {
+        enemyWeakCountdown--;
+        if (enemyWeakCountdown === 0) {
+            document.getElementById("resultText").innerText = `📉 敵の虚弱が回復した。\n` + document.getElementById("resultText").innerText;
         }
     }
 
@@ -753,17 +912,19 @@ function playGame(playerHand) {
         
         let earnedGold = baseReward + overkillAmount;
         
-        if (turnFlags.doubleGoldOnKill === true) {
-            earnedGold *= 2;
-            alert("🎰 ハイ＆ロー発動！獲得ローが2倍になった！（+" + earnedGold + "ロー）");
+        // ★修正：ハイローの倍率処理
+        if (turnFlags.goldMultiplier > 1) {
+            earnedGold *= turnFlags.goldMultiplier;
+            alert(`🎰 ハイ＆ロー発動！獲得ローが${turnFlags.goldMultiplier}倍になった！（+${earnedGold}ロー）`);
         }
         playerGold += earnedGold;
         updateGoldDisplay();
 
-        if (turnFlags.healOnKill === playerHand) {
-            playerLife = Math.min(playerLife + 1, playerMaxLife);
+        // ★修正：癒し系の処理
+        if (turnFlags.healOnKill && turnFlags.healOnKill.hand === playerHand) {
+            playerLife = Math.min(playerLife + turnFlags.healOnKill.amount, playerMaxLife);
             updateLifeDisplay();
-            alert("💖 癒しの力が発動！指定の手でトドメを刺し、ライフが1回復した！");
+            alert(`💖 癒しの力が発動！ライフが${turnFlags.healOnKill.amount}回復した！`);
         }
 
         se.clear(); disableButtons();
@@ -784,7 +945,7 @@ function playGame(playerHand) {
     }
 
     damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
-    turnFlags = { healOnKill: null, doubleGoldOnKill: false };
+    turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
     
     turnBaseAttackBonus = 0;
 
@@ -796,6 +957,7 @@ function playGame(playerHand) {
     playedCardsThisTurn = new Array();
     updateHistoryUI();
     updateDamagePreview();
+    updateTurnDisplay();
 
     setRandomBaseProb(); drawCards(turnDrawCount);
 }
