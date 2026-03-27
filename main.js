@@ -51,7 +51,7 @@ let trainingCount = 3;
 const stageData = new Array(
     { hp: 5,  probPattern: new Array(80, 10, 10) },
     { hp: 8,  probPattern: new Array(50, 40, 10) },
-    { hp: 12,  probPattern: new Array(34, 33, 33) },
+    { hp: 12,  probPattern: new Array(45,45,5 ) },
     { hp: 16,  probPattern: new Array(20, 20, 60) },
     { hp: 22,  probPattern: new Array(40, 40, 20) },
     { hp: 26,  probPattern: new Array(60, 20, 20) },
