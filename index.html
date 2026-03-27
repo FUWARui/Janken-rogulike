@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>じゃんけんローグライク</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="status-bar">
+            <span id="stageDisplay">🚩 ステージ 1</span>
+            <span id="turnDisplay" class="turn-display">⏳ 大技まで: 10</span>
+            <span id="lifeDisplay">❤️ あなた: 3 / 😈 敵: 5</span>
+            <span id="goldDisplay" style="color: #f1c40f;">💰 0 ロー</span>
+        </div>
+
+        <div id="buffBar" class="buff-bar">
+            ✨ 永久バフ: <span id="buffList"></span>
+        </div>
+
+        <div id="battleScreen">
+            <div class="prob-board" id="probDisplay">計算中...</div>
+            
+            <div id="playHistory" class="play-history">
+                <span style="color: #bdc3c7; font-size: 0.9em; font-weight: bold; white-space: nowrap;">🕒 ターン履歴: </span>
+                <div id="historyCards" class="history-cards-container">なし</div>
+            </div>
+
+            <div id="handArea"></div>
+            
+            <div class="action-area">
+                <button class="action-btn" id="btnRock" onclick="playGame('グー')">
+                    ✊ グー
+                    <div class="dmg-preview" id="previewRock">⚔️ 予想ダメ: 1</div>
+                </button>
+                <button class="action-btn" id="btnScissors" onclick="playGame('チョキ')">
+                    ✌️ チョキ
+                    <div class="dmg-preview" id="previewScissors">⚔️ 予想ダメ: 1</div>
+                </button>
+                <button class="action-btn" id="btnPaper" onclick="playGame('パー')">
+                    ✋ パー
+                    <div class="dmg-preview" id="previewPaper">⚔️ 予想ダメ: 1</div>
+                </button>
+            </div>
+        </div>
+
+        <div id="rewardScreen" style="display: none;">
+            <h2 style="font-size: 2em; margin-top: 40px;">戦利品！カードを1枚デッキに追加できる</h2>
+            <div id="rewardCards" class="reward-container"></div>
+            <button class="action-btn skip-btn" onclick="skipReward()">スキップ（引かない） ➡️</button>
+        </div>
+
+        <div id="eliteRewardScreen" style="display: none;">
+            <h2 style="font-size: 2em; margin-top: 40px;">強敵を撃破した！永久バフを選択せよ</h2>
+            <div class="route-container">
+                <div class="route-card route-normal" onclick="chooseEliteBuff('レドロー')">
+                    <div class="route-icon">🎴</div>
+                    <div class="route-title">レドロー</div>
+                    <div class="route-desc">バトル開始時の<br>初期手札を 2枚 増やす。</div>
+                </div>
+                <div class="route-card route-elite" onclick="chooseEliteBuff('プドロー')">
+                    <div class="route-icon">🃏</div>
+                    <div class="route-title">プドロー</div>
+                    <div class="route-desc">毎ターンの<br>ドロー枚数を 1枚 増やす。</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="routeScreen" style="display: none;">
+            <h2 style="font-size: 2em; margin-top: 40px;">分かれ道だ。どこへ進む？</h2>
+            <div class="route-container">
+                <div class="route-card route-normal" onclick="chooseRoute('normal')">
+                    <div class="route-icon">⚔️</div>
+                    <div class="route-title">通常の敵</div>
+                    <div class="route-desc">普通の敵と戦う。<br>手堅く進みたい時に。</div>
+                </div>
+                <div class="route-card route-elite" onclick="chooseRoute('elite')">
+                    <div class="route-icon">💀</div>
+                    <div class="route-title">強敵（エリート）</div>
+                    <div class="route-desc">HPが高く、大技を使う。<br>※倒すと強力なバフ獲得！</div>
+                </div>
+                <div class="route-card route-shop" onclick="chooseRoute('shop')">
+                    <div class="route-icon">🛒</div>
+                    <div class="route-title">ショップ</div>
+                    <div class="route-desc">カードの売買や削除。<br>貯めたお金を使おう。</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="shopScreen" style="display: none; padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2 style="font-size: 2em; margin: 0 !important; text-align: left;">🛒 商人の店</h2>
+                <div style="font-size: 1.5em; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;" id="shopGoldDisplay">💰 所持金: 0 ロー</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                <div id="shopCards" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-around; gap: 20px;">
+                <div style="background: #2c3e50; padding: 15px; border-radius: 12px; flex: 1; border: 3px solid #7f8c8d;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 1.2em;">🗑️ カード削除</h3>
+                    <p style="font-size: 0.85em; color: #bdc3c7; margin-bottom: 10px;">不要なカードを消してデッキを圧縮する。<br>引く確率をコントロールしよう。</p>
+                    <button class="action-btn" id="btnRemoveCard" onclick="openRemoveModal()" style="font-size: 1.2em; padding: 10px 20px; margin: 0;">カードを削除 (<span id="removeCostDisplay">20</span> ロー)</button>
+                    <div id="removeLimitDisplay" style="font-size: 0.8em; color: #e74c3c; margin-top: 5px; font-weight: bold;">残り 3 回</div>
+                </div>
+                <div style="background: #2c3e50; padding: 15px; border-radius: 12px; flex: 1; border: 3px solid #f1c40f;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 1.2em; color: #f1c40f;">✨ 永久バフ購入</h3>
+                    <p id="shopBuffName" style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; color: #fff;">???</p>
+                    <button class="action-btn" id="btnBuyBuff" onclick="buyShopBuff()" style="font-size: 1.2em; padding: 10px 20px; margin: 0; background-color: #f1c40f; color: #2c3e50; box-shadow: 0 4px 0 #d4ac0d;">購入 (1000 ロー)</button>
+                </div>
+            </div>
+            <button class="action-btn skip-btn" style="margin-top: 15px; font-size: 1.2em !important; padding: 10px 30px !important;" onclick="leaveShop()">店を出る ➡️</button>
+        </div>
+
+        <div id="removeModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2 style="margin-top: 0 !important; color: #e74c3c;">削除するカードを選んでください</h2>
+                <div id="removeCardList" class="modal-card-list"></div>
+                <button class="action-btn skip-btn" style="margin-top: 20px; font-size: 1.2em !important; padding: 10px 30px !important;" onclick="closeRemoveModal()">キャンセル</button>
+            </div>
+        </div>
+
+        <div id="viewModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <h2 id="viewModalTitle" style="margin-top: 0 !important; color: #ecf0f1;">確認</h2>
+                <div id="viewCardList" class="modal-card-list"></div>
+                <button class="action-btn skip-btn" style="margin-top: 20px; font-size: 1.2em !important; padding: 10px 30px !important;" onclick="closeViewModal()">閉じる</button>
+            </div>
+        </div>
+
+        <h2 id="resultText">まずはカードを使うか、手を出してね！</h2>
+        
+        <div id="battlePopup">
+            <div id="popupTitle">WIN!!</div>
+            <div id="popupDetail">グー VS チョキ</div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
