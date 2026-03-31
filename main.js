@@ -147,32 +147,52 @@ sideBar.innerHTML = `
     </div>
 `;
 document.querySelector('.game-container').appendChild(sideBar);
+// =========================================
+// 2. 中央の巨大HPボード（敵のHP専用にして大迫力に！）
+// =========================================
+let enemyHpBoard = document.createElement('div');
+enemyHpBoard.id = "enemyHpBoard";
+enemyHpBoard.style.backgroundColor = "rgba(44, 62, 80, 0.9)"; 
+enemyHpBoard.style.padding = "15px 0"; 
+enemyHpBoard.style.borderRadius = "12px"; 
+enemyHpBoard.style.margin = "10px auto 20px auto"; 
+enemyHpBoard.style.maxWidth = "600px";
+enemyHpBoard.style.textAlign = "center";
+enemyHpBoard.style.border = "4px solid #c0392b"; 
+enemyHpBoard.style.boxShadow = "inset 0 0 20px rgba(192, 57, 43, 0.5), 0 4px 10px rgba(0,0,0,0.5)";
 
-let hpInfoDiv = document.createElement('div');
-hpInfoDiv.id = "hpInfo";
-hpInfoDiv.style.backgroundColor = "#2c3e50"; 
-hpInfoDiv.style.padding = "10px 0"; 
-hpInfoDiv.style.borderRadius = "12px"; 
-hpInfoDiv.style.margin = "10px auto 15px auto"; 
-hpInfoDiv.style.maxWidth = "700px";
-hpInfoDiv.style.display = "flex"; 
-hpInfoDiv.style.justifyContent = "center"; 
-hpInfoDiv.style.border = "3px solid #7f8c8d"; 
-hpInfoDiv.style.boxShadow = "inset 0 4px 6px rgba(0,0,0,0.3)";
-
-hpInfoDiv.innerHTML = `
-    <div style="flex: 1; text-align: center; border-right: 2px solid #34495e; padding: 5px;">
-        <div style="color: #2ecc71; font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">🧑 あなたのHP</div>
-        <div style="font-size: 2em; color: #fff; font-weight: bold; text-shadow: 2px 2px 0 #000;"><span id="playerHpDisplay">3 / 3</span></div>
-    </div>
-    <div style="flex: 1; text-align: center; padding: 5px;">
-        <div style="color: #e74c3c; font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">😈 敵のHP</div>
-        <div style="font-size: 2em; color: #fff; font-weight: bold; text-shadow: 2px 2px 0 #000;"><span id="enemyHpDisplay">0 / 0</span></div>
-    </div>
+enemyHpBoard.innerHTML = `
+    <div style="color: #e74c3c; font-weight: bold; font-size: 1.3em; margin-bottom: 5px; text-shadow: 1px 1px 0 #000; letter-spacing: 2px;">😈 敵のHP</div>
+    <div style="font-size: 3.5em; color: #fff; font-weight: bold; text-shadow: 3px 3px 0 #000; font-family: 'Courier New', monospace;"><span id="enemyHpDisplay">0 / 0</span></div>
 `;
-statusBar.parentNode.insertBefore(hpInfoDiv, statusBar.nextSibling);
+statusBar.parentNode.insertBefore(enemyHpBoard, statusBar.nextSibling);
 
-// ★新規追加：訓練場UIの動的生成
+// =========================================
+// 3. プレイヤーのHPボード（右上の所持金の下へ配置）
+// =========================================
+let playerHpBoard = document.createElement('div');
+playerHpBoard.id = "playerHpBoard";
+playerHpBoard.style.position = "absolute";
+playerHpBoard.style.top = "60px"; // 所持金表示のすぐ下あたり
+playerHpBoard.style.right = "20px"; // 画面の右端に寄せる
+playerHpBoard.style.backgroundColor = "rgba(39, 174, 96, 0.9)";
+playerHpBoard.style.color = "#fff";
+playerHpBoard.style.padding = "10px 20px";
+playerHpBoard.style.borderRadius = "8px";
+playerHpBoard.style.border = "3px solid #2ecc71";
+playerHpBoard.style.boxShadow = "0 4px 6px rgba(0,0,0,0.4)";
+playerHpBoard.style.textAlign = "center";
+playerHpBoard.style.zIndex = "10";
+
+playerHpBoard.innerHTML = `
+    <div style="font-size: 0.9em; font-weight: bold; margin-bottom: 3px; text-shadow: 1px 1px 0 #000;">🧑 あなたのHP</div>
+    <div style="font-size: 1.8em; font-weight: bold; text-shadow: 2px 2px 0 #000;"><span id="playerHpDisplay">10 / 10</span></div>
+`;
+document.querySelector('.game-container').appendChild(playerHpBoard);
+
+// =========================================
+// ★復活：訓練場UIの動的生成（これが消えちゃってました！）
+// =========================================
 let trainingScreen = document.createElement('div');
 trainingScreen.id = "trainingScreen";
 trainingScreen.style.display = "none";
@@ -190,6 +210,17 @@ trainingScreen.innerHTML = `
 `;
 document.querySelector('.game-container').appendChild(trainingScreen);
 
+let isBattleAnimating = false; 
+
+function getHandIconText(handStr) {
+    if (handStr === "グー") return "✊";
+    if (handStr === "チョキ") return "✌️";
+    if (handStr === "パー") return "✋";
+    if (handStr === "グパ") return "✊✋";
+    if (handStr === "グチョ") return "✊✌️";
+    if (handStr === "チョパ") return "✌️✋";
+    return "❓";
+}
 
 function openViewModal(type) {
     let modal = document.getElementById("viewModal");
@@ -293,24 +324,49 @@ function shuffleDeck() {
 }
 
 function drawCards(num) {
-    let discardedDueToLimit = false; 
-    for(let i = 0; i < num; i++) {
-        if (deck.length === 0) {
-            if (discardPile.length === 0) { break; }
-            deck = Array.from(discardPile); discardPile = new Array(); shuffleDeck(); se.shuffle(); 
-            let resText = document.getElementById("resultText"); resText.innerText = "🔄 山札が空になった！捨て札をシャッフルして山札を再構築！\n" + resText.innerText;
+    // 引く枚数が0以下なら何もしない（終了条件）
+    if (num <= 0) return;
+
+    let discardedDueToLimit = false;
+
+    // 1枚引く処理
+    if (deck.length === 0) {
+        if (discardPile.length === 0) { 
+            // 山札も捨て札も完全に空なら終了
+            updateDeckUI();
+            return; 
         }
-        let drawnCard = deck.pop();
-        if (drawnCard) {
-            if (hand.length >= MAX_HAND_SIZE) { discardPile.push(drawnCard); discardedDueToLimit = true; } 
-            else { hand.push(drawnCard); }
+        // 山札が空ならリシャッフル
+        deck = Array.from(discardPile); discardPile = new Array(); shuffleDeck(); se.shuffle(); 
+        let resText = document.getElementById("resultText"); resText.innerText = "🔄 山札が空になった！捨て札をシャッフルして再構築！\n" + resText.innerText;
+    }
+
+    let drawnCard = deck.pop();
+    if (drawnCard) {
+        if (hand.length >= MAX_HAND_SIZE) { 
+            discardPile.push(drawnCard); discardedDueToLimit = true; 
+        } else {
+            // ★重要：新しく引いたカードにフラグを立てる
+            drawnCard.isNewDraw = true;
+            hand.push(drawnCard);
+            
+            // カードが移動する「シュッ」という音を出す（お好みでse.card()などに変えてもOK）
+            // playSynthSound('sawtooth', 880.00, 0.05, 0.1); 
         }
     }
+
     if (discardedDueToLimit) {
         let resText = document.getElementById("resultText");
         resText.innerText = "⚠️ 手札が上限（" + MAX_HAND_SIZE + "枚）のため、引いたカードは捨てられました！\n" + resText.innerText;
     }
+
+    // 1枚引いた状態で手札を再描画（ここでアニメーションが発動）
     renderHand(); updateDeckUI();
+
+    // ★最重要：少し時間を置いてから、次の1枚を引く（自分自身を呼び出す）
+    setTimeout(() => {
+        drawCards(num - 1); // 枚数を1枚減らして、また引く
+    }, 400); // ここが「バババッ」の間隔。0.1秒（100ms）。
 }
 
 function renderHand() {
@@ -329,8 +385,20 @@ function renderHand() {
         let safeName = (card.isUpgraded ? "✨" : "") + (card.name || "不明");
         let safeDesc = card.isUpgraded ? (card.upDesc || card.desc) : card.desc;
         let safeIcon = card.icon || "❓";
-        
         cardDiv.innerHTML = `<div class="card-name">${safeName}</div><div class="card-icon">${safeIcon}</div><div class="card-desc" style="font-size:0.7em;">${safeDesc}</div>`;
+        
+        // ★新規追加：アニメーション用のフラグ管理
+        // カードオブジェクトに「isNewDraw」というフラグが立っていたら、クラスを付与する
+        if (card.isNewDraw) {
+            cardDiv.classList.add("card-drawing");
+            
+            // アニメーションが終わる頃（0.5秒後）にクラスを外して、クリック可能にする
+            setTimeout(() => {
+                cardDiv.classList.remove("card-drawing");
+                card.isNewDraw = false; // フラグをおろす
+            }, 500);
+        }
+
         cardDiv.onclick = function() { useCard(index); }; handArea.appendChild(cardDiv);
     });
 }
@@ -342,11 +410,27 @@ function showPopup(type, title, detail) {
     clearTimeout(popupTimer); popupTimer = setTimeout(() => { popup.classList.remove("show"); }, 1200);
 }
 
-function spawnDamageEffect(damageAmount) {
-    let damageText = document.createElement("div"); damageText.innerText = "-" + damageAmount; damageText.className = "damage-popup";
-    let lifeDisplay = document.getElementById("playerHpDisplay"); 
-    let rect = lifeDisplay.getBoundingClientRect();
-    damageText.style.left = (rect.right + 20) + "px"; damageText.style.top = (rect.top + window.scrollY - 30) + "px"; document.body.appendChild(damageText);
+// =========================================
+// ★修正：ダメージエフェクトの出現位置を調整
+// =========================================
+function spawnDamageEffect(damageAmount, isPlayer = false) {
+    let damageText = document.createElement("div"); 
+    damageText.innerText = "-" + damageAmount; 
+    damageText.className = "damage-popup";
+    
+    // プレイヤーへのダメージか、敵へのダメージかで基準位置を切り替える
+    let targetId = isPlayer ? "playerHpBoard" : "enemyHpBoard";
+    let targetBoard = document.getElementById(targetId);
+    
+    if (targetBoard) {
+        let rect = targetBoard.getBoundingClientRect();
+        // 敵ならボードの右側、自分ならボードの左側あたりに出現させる
+        let popX = isPlayer ? (rect.left - 50) : (rect.right - 60);
+        damageText.style.left = popX + "px"; 
+        damageText.style.top = (rect.top + window.scrollY) + "px"; 
+    }
+    
+    document.body.appendChild(damageText);
     setTimeout(() => { damageText.remove(); }, 1000);
 }
 
@@ -835,131 +919,201 @@ function decideEnemyHand() {
 }
 
 function playGame(playerHand) {
-    turnCount++; 
+    // 演出中は他のボタンを押せないようにブロックする！
+    if (isBattleAnimating) return;
+    isBattleAnimating = true;
+
+    turnCount++; updateTurnDisplay();
     let container = document.querySelector('.game-container'); let statusBar = document.querySelector('.status-bar');
+    let body = document.body;
 
     if ((currentEnemyType === "elite" || currentEnemyType === "boss") && turnCount >= 10) {
         playerLife = 0; updateLifeDisplay(); 
-        showPopup("lose", "ANNIHILATED", "タイムオーバー：即死攻撃"); se.bomb(); container.classList.add('shake'); disableButtons(); return; 
+        showPopup("lose", "ANNIHILATED", "タイムオーバー：即死攻撃"); se.bomb(); container.classList.add('shake'); disableButtons(); 
+        isBattleAnimating = false;
+        return; 
     }
 
-    let enemyHand = decideEnemyHand(); let isWin = false; let isTie = false;
-    if (playerHand === "グパ") { if (enemyHand === "チョキ" || enemyHand === "グー") { isWin = true; } else { isTie = true; } } 
-    else if (playerHand === "グチョ") { if (enemyHand === "パー" || enemyHand === "チョキ") { isWin = true; } else { isTie = true; } } 
-    else if (playerHand === "チョパ") { if (enemyHand === "グー" || enemyHand === "パー") { isWin = true; } else { isTie = true; } } 
-    else { if (playerHand === enemyHand) { isTie = true; } else if ((playerHand === "グー" && enemyHand === "チョキ") || (playerHand === "チョキ" && enemyHand === "パー") || (playerHand === "パー" && enemyHand === "グー")) { isWin = true; } }
+    // まず相手の手を裏側でコッソリ決めておく
+    let enemyHand = decideEnemyHand(); 
 
-    let detailText = playerHand + " VS " + enemyHand;
-    let overkillAmount = 0;
+    // --- 演出フェーズ ---
+    // 前の演出が残っていたら消す
+    let oldOverlay = document.getElementById("handOverlay");
+    if(oldOverlay) oldOverlay.remove();
 
-    if (isWin === true) {
-        let finalDamage = (playerDamage + durationBuffs.bonusDamage + turnBaseAttackBonus) * damageMultipliers.all; 
-        if (playerHand === "グー") finalDamage *= damageMultipliers["グー"]; else if (playerHand === "チョキ") finalDamage *= damageMultipliers["チョキ"]; else if (playerHand === "パー") finalDamage *= damageMultipliers["パー"];
-        
-        // ★新規追加：虚弱（ロウワー）のダメージ増加計算
-        if (enemyWeakCountdown > 0) {
-            finalDamage = Math.floor(finalDamage * enemyWeakMultiplier);
-        }
+    // 手を出すための専用レイヤーを作る
+    let overlay = document.createElement("div");
+    overlay.id = "handOverlay";
+    document.body.appendChild(overlay);
 
-        if (finalDamage > enemyLife) { overkillAmount = finalDamage - enemyLife; }
-        enemyLife -= finalDamage;
-        se.win(); statusBar.classList.add('status-bar-win'); setTimeout(() => statusBar.classList.remove('status-bar-win'), 1000); 
-        spawnDamageEffect(finalDamage); showPopup("win", "WIN!!", detailText); 
+    let enemyZone = document.createElement("div");
+    enemyZone.className = "enemy-zone";
+    overlay.appendChild(enemyZone);
 
-        // ★新規追加：ロウワーの効果発動
-        if (turnFlags.lowerUsed) {
-            enemyWeakCountdown = 3;
-            enemyWeakMultiplier = turnFlags.lowerMultiplier;
-            alert(`📉 ロウワー成功！敵は3ターンの間「虚弱（被ダメ${enemyWeakMultiplier}倍）」になった！`);
-        }
+    let playerZone = document.createElement("div");
+    playerZone.className = "player-zone";
+    overlay.appendChild(playerZone);
 
-    } else if (isTie === true) {
-        se.tie(); showPopup("tie", "DRAW", detailText);
-    } else {
-        playerLife--; se.lose(); showPopup("lose", "LOSE...", detailText); container.classList.add('shake'); setTimeout(() => { container.classList.remove('shake'); }, 500);
-    }
-
-    updateLifeDisplay();
-
-    // 崖っぷちのカウントダウン
-    if (poisonCountdown > 0 && enemyLife > 0) {
-        poisonCountdown--;
-        if (poisonCountdown === 0) {
-            enemyLife -= poisonDamage;
-            se.bomb();
-            spawnDamageEffect(poisonDamage);
-            alert(`☠️ 崖っぷちの毒が発動！敵に${poisonDamage}ダメージ！`);
-            updateLifeDisplay();
-        } else {
-            document.getElementById("resultText").innerText = `☠️ 毒発動まであと ${poisonCountdown} ターン...\n` + document.getElementById("resultText").innerText;
-        }
-    }
-
-    // ★新規追加：虚弱のカウントダウン
-    if (enemyWeakCountdown > 0) {
-        enemyWeakCountdown--;
-        if (enemyWeakCountdown === 0) {
-            document.getElementById("resultText").innerText = `📉 敵の虚弱が回復した。\n` + document.getElementById("resultText").innerText;
-        }
-    }
-
-    if (playerLife <= 0) {
-        disableButtons(); return;
-    } else if (enemyLife <= 0) {
-        let baseReward = 20;
-        if (currentEnemyType === "elite") baseReward = 40;
-        if (currentEnemyType === "boss") baseReward = 100;
-        
-        let earnedGold = baseReward + overkillAmount;
-        
-        // ★修正：ハイローの倍率処理
-        if (turnFlags.goldMultiplier > 1) {
-            earnedGold *= turnFlags.goldMultiplier;
-            alert(`🎰 ハイ＆ロー発動！獲得ローが${turnFlags.goldMultiplier}倍になった！（+${earnedGold}ロー）`);
-        }
-        playerGold += earnedGold;
-        updateGoldDisplay();
-
-        // ★修正：癒し系の処理
-        if (turnFlags.healOnKill && turnFlags.healOnKill.hand === playerHand) {
-            playerLife = Math.min(playerLife + turnFlags.healOnKill.amount, playerMaxLife);
-            updateLifeDisplay();
-            alert(`💖 癒しの力が発動！ライフが${turnFlags.healOnKill.amount}回復した！`);
-        }
-
-        se.clear(); disableButtons();
-        
-        if (currentStage === 3) {
-            playerMaxLife += 1; 
-            playerLife += 1; hasGodHand = true; playerDamage = 2; 
-            activeBuffs.push("❤️ ライフプラス (+1)"); activeBuffs.push("✊ ゴッドハンド (基礎ダメ2倍)");
-            document.getElementById("buffBar").style.display = "block"; document.getElementById("buffList").innerText = activeBuffs.join(", ");
-        }
-        
-        setTimeout(() => { 
-            if (currentStage >= 11) { alert("🎉 最終ボスを撃破！！完全クリアおめでとう！！ 🎉"); } 
-            else if (currentEnemyType === "elite") { showEliteRewardScreen(); } 
-            else { showRewardScreen(); }
-        }, 1500); 
-        return;
-    }
-
-    damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
-    turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
+    // 【1】まず、自分の手を画面下部に出現させる！
+    let pHandDiv = document.createElement("div");
+    pHandDiv.className = "show-hand";
+    pHandDiv.innerText = getHandIconText(playerHand);
+    playerZone.appendChild(pHandDiv);
     
-    turnBaseAttackBonus = 0;
+    // シュッという音（必要に応じて変えてね）
+    playSynthSound('sawtooth', 440.00, 0.1, 0.1); 
 
-    if (durationBuffs.turnsLeft > 0) {
-        durationBuffs.turnsLeft--;
-        if (durationBuffs.turnsLeft === 0) { durationBuffs.bonusDamage = 0; }
-    }
-    
-    playedCardsThisTurn = new Array();
-    updateHistoryUI();
-    updateDamagePreview();
-    updateTurnDisplay();
+    // 【2】0.4秒後（400ms後）に、相手の手を画面上部に出現させる！
+    setTimeout(() => {
+        let eHandDiv = document.createElement("div");
+        eHandDiv.className = "show-hand";
+        eHandDiv.innerText = getHandIconText(enemyHand);
+        enemyZone.appendChild(eHandDiv);
+        
+        playSynthSound('square', 330.00, 0.1, 0.1);
 
-    setRandomBaseProb(); drawCards(turnDrawCount);
+        // 【3】0.08秒後（80ms後）に、一気に勝敗の判定とフラッシュ演出を爆発させる！
+        setTimeout(() => {
+            
+            // 演出用レイヤーは、ポップアップが消える頃（1秒後）にフワッと消す
+            setTimeout(() => {
+                overlay.style.opacity = 0;
+                setTimeout(() => overlay.remove(), 300);
+            }, 1000);
+
+            // --- 判定・ダメージ処理フェーズ（これ以降は元のコードと同じ！） ---
+            let isWin = false; let isTie = false;
+            if (playerHand === "グパ") { if (enemyHand === "チョキ" || enemyHand === "グー") { isWin = true; } else { isTie = true; } } 
+            else if (playerHand === "グチョ") { if (enemyHand === "パー" || enemyHand === "チョキ") { isWin = true; } else { isTie = true; } } 
+            else if (playerHand === "チョパ") { if (enemyHand === "グー" || enemyHand === "パー") { isWin = true; } else { isTie = true; } } 
+            else { if (playerHand === enemyHand) { isTie = true; } else if ((playerHand === "グー" && enemyHand === "チョキ") || (playerHand === "チョキ" && enemyHand === "パー") || (playerHand === "パー" && enemyHand === "グー")) { isWin = true; } }
+
+            let detailText = playerHand + " VS " + enemyHand;
+            let overkillAmount = 0;
+
+            if (isWin === true) {
+                let finalDamage = (playerDamage + durationBuffs.bonusDamage + turnBaseAttackBonus) * damageMultipliers.all; 
+                if (playerHand === "グー") finalDamage *= damageMultipliers["グー"]; else if (playerHand === "チョキ") finalDamage *= damageMultipliers["チョキ"]; else if (playerHand === "パー") finalDamage *= damageMultipliers["パー"];
+                
+                if (enemyWeakCountdown > 0) { finalDamage = Math.floor(finalDamage * enemyWeakMultiplier); }
+
+                if (finalDamage > enemyLife) { overkillAmount = finalDamage - enemyLife; }
+                enemyLife -= finalDamage;
+                se.win(); statusBar.classList.add('status-bar-win'); setTimeout(() => statusBar.classList.remove('status-bar-win'), 1000); 
+                spawnDamageEffect(finalDamage); showPopup("win", "WIN!!", detailText); 
+
+                if (turnFlags.lowerUsed) {
+                    enemyWeakCountdown = 3; enemyWeakMultiplier = turnFlags.lowerMultiplier;
+                    alert(`📉 ロウワー成功！敵は3ターンの間「虚弱（被ダメ${enemyWeakMultiplier}倍）」になった！`);
+                }
+
+                if (playerHand === "グー") {
+                    body.classList.add("win-rock"); 
+                    playSynthSound('square', 110.00, 0.3, 0.5); 
+                } else if (playerHand === "チョキ") {
+                    body.classList.add("win-scissors"); 
+                    playSynthSound('sawtooth', 600.00, 0.2, 0.4); 
+                } else if (playerHand === "パー") {
+                    body.classList.add("win-paper"); 
+                    playSynthSound('sine', 440.00, 0.4, 0.3); 
+                }
+                
+                setTimeout(() => {
+                    body.classList.remove("win-rock", "win-scissors", "win-paper");
+                }, 800);
+
+            } else if (isTie === true) {
+                se.tie(); showPopup("tie", "DRAW", detailText);
+            } else {
+                playerLife--; se.lose(); showPopup("lose", "LOSE...", detailText); container.classList.add('shake'); setTimeout(() => { container.classList.remove('shake'); }, 500);
+            }
+
+            updateLifeDisplay();
+
+            if (poisonCountdown > 0 && enemyLife > 0) {
+                poisonCountdown--;
+                if (poisonCountdown === 0) {
+                    enemyLife -= poisonDamage; se.bomb(); spawnDamageEffect(poisonDamage);
+                    alert(`☠️ 崖っぷちの毒が発動！敵に${poisonDamage}ダメージ！`);
+                    updateLifeDisplay();
+                } else {
+                    document.getElementById("resultText").innerText = `☠️ 毒発動まであと ${poisonCountdown} ターン...\n` + document.getElementById("resultText").innerText;
+                }
+            }
+
+            if (enemyWeakCountdown > 0) {
+                enemyWeakCountdown--;
+                if (enemyWeakCountdown === 0) { document.getElementById("resultText").innerText = `📉 敵の虚弱が回復した。\n` + document.getElementById("resultText").innerText; }
+            }
+
+            if (playerLife <= 0) {
+                disableButtons(); 
+                isBattleAnimating = false; // ロック解除
+                return;
+            } else if (enemyLife <= 0) {
+                body.classList.add("finish-effect");
+                
+                playSynthSound('square', 55.00, 1.0, 0.8); 
+                playSynthSound('noise', 0, 1.5, 0.6); 
+                
+                setTimeout(() => {
+                    let baseReward = 20;
+                    if (currentEnemyType === "elite") baseReward = 40;
+                    if (currentEnemyType === "boss") baseReward = 100;
+                    let earnedGold = (baseReward + overkillAmount) * turnFlags.goldMultiplier;
+                    
+                    if (turnFlags.goldMultiplier > 1) {
+                        alert(`🎰 ハイ＆ロー発動！獲得ローが${turnFlags.goldMultiplier}倍になった！（+${earnedGold}ロー）`);
+                    }
+                    playerGold += earnedGold; updateGoldDisplay();
+
+                    if (turnFlags.healOnKill && turnFlags.healOnKill.hand === playerHand) {
+                        playerLife = Math.min(playerLife + turnFlags.healOnKill.amount, playerMaxLife);
+                        updateLifeDisplay();
+                        alert(`💖 癒しの力が発動！ライフが${turnFlags.healOnKill.amount}回復した！`);
+                    }
+
+                    body.classList.remove("finish-effect");
+                    se.clear(); disableButtons();
+                    
+                    if (currentStage === 3) {
+                        playerMaxLife += 1; playerLife += 1; hasGodHand = true; playerDamage = 2; 
+                        activeBuffs.push("❤️ ライフプラス (+1)"); activeBuffs.push("✊ ゴッドハンド (基礎ダメ2倍)");
+                        document.getElementById("buffBar").style.display = "block"; document.getElementById("buffList").innerText = activeBuffs.join(", ");
+                    }
+                    
+                    setTimeout(() => { 
+                        if (currentStage >= 11) { alert("🎉 最終ボスを撃破！！完全クリアおめでとう！！ 🎉"); } 
+                        else if (currentEnemyType === "elite") { showEliteRewardScreen(); } 
+                        else { showRewardScreen(); }
+                    }, 1000); 
+
+                    isBattleAnimating = false; // 完全に終了したらロック解除
+
+                }, 3000); 
+                
+                return; 
+            }
+
+            damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
+            turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
+            turnBaseAttackBonus = 0;
+
+            if (durationBuffs.turnsLeft > 0) {
+                durationBuffs.turnsLeft--;
+                if (durationBuffs.turnsLeft === 0) { durationBuffs.bonusDamage = 0; }
+            }
+            
+            playedCardsThisTurn = new Array(); updateHistoryUI(); updateDamagePreview(); updateTurnDisplay();
+            setRandomBaseProb(); drawCards(turnDrawCount);
+            
+            // ターン終了時にロック解除
+            isBattleAnimating = false;
+
+        }, 400); // ここが0.08秒（80ms）のタメ！！！
+
+    }, 600); // ここが0.4秒のタメ！！！
 }
 
 function disableButtons() {
