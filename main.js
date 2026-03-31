@@ -198,15 +198,18 @@ trainingScreen.id = "trainingScreen";
 trainingScreen.style.display = "none";
 trainingScreen.style.paddingTop = "10px";
 trainingScreen.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <h2 style="font-size: 2em; margin: 0 !important; text-align: left;">🏕️ 訓練場</h2>
-        <div style="font-size: 1.5em; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;">💰 所持金: <span id="trainingGoldDisplay">0</span> ロー</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: rgba(44, 62, 80, 0.8); padding: 10px 20px; border-radius: 12px; border: 2px solid #34495e;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <h2 style="font-size: 1.8em; margin: 0 !important; text-align: left;">🏕️ 訓練場</h2>
+            <div style="font-size: 1.2em; color: #f1c40f; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;">💰 所持金: <span id="trainingGoldDisplay">0</span></div>
+            <div style="font-size: 1.2em; color: #e74c3c; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 8px;">残り: <span id="trainingCountDisplay">3</span> 回</div>
+        </div>
+        <button class="action-btn skip-btn" style="font-size: 1.1em !important; padding: 10px 20px !important; margin: 0; background-color: #3498db;" onclick="leaveTraining()">訓練を終える ➡️</button>
     </div>
-    <p style="font-size: 1.2em;">ローを支払ってカードをアップグレードできる。 <span style="color:#e74c3c;font-weight:bold;">残り回数: <span id="trainingCountDisplay">3</span> 回</span></p>
+    
     <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-        <div id="trainingCards" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; max-height: 400px; overflow-y: auto; padding: 10px;"></div>
+        <div id="trainingCards" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; max-height: 55vh; overflow-y: auto; padding: 10px;"></div>
     </div>
-    <button class="action-btn skip-btn" style="margin-top: 15px; font-size: 1.2em !important; padding: 10px 30px !important;" onclick="leaveTraining()">訓練を終える ➡️</button>
 `;
 document.querySelector('.game-container').appendChild(trainingScreen);
 
