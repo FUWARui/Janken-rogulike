@@ -14,6 +14,21 @@ let damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
 let turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
 let durationBuffs = { bonusDamage: 0, turnsLeft: 0 };
 
+// =========================================
+// ★新規追加：敵のデータと状態管理
+// =========================================
+let currentEnemyName = "敵";
+let currentEnemyIcon = "😈";
+let currentEnemyDamage = 1;
+let currentEnemyBehavior = "normal";
+
+const enemyList = [
+    { name: "スライム", icon: "💧", hpMod: 0.8, dmg: 1, type: "random", desc: "完全にランダム" },
+    { name: "ゴブリン", icon: "👺", hpMod: 1.0, dmg: 1, type: "normal", desc: "ランダムに偏る" },
+    { name: "脳筋オーク", icon: "👹", hpMod: 1.5, dmg: 2, type: "rock", desc: "グーが多い。攻撃力2" },
+    { name: "トリックスター", icon: "🃏", hpMod: 0.9, dmg: 1, type: "counter", desc: "プレイヤーの前の手に対策する" }
+];
+
 let currentStage = 1; 
 let currentEnemyType = "normal"; 
 let hasGodHand = false;
@@ -173,8 +188,8 @@ statusBar.parentNode.insertBefore(enemyHpBoard, statusBar.nextSibling);
 let playerHpBoard = document.createElement('div');
 playerHpBoard.id = "playerHpBoard";
 playerHpBoard.style.position = "absolute";
-playerHpBoard.style.top = "60px"; // 所持金表示のすぐ下あたり
-playerHpBoard.style.right = "20px"; // 画面の右端に寄せる
+playerHpBoard.style.top = "60px"; 
+playerHpBoard.style.right = "20px"; 
 playerHpBoard.style.backgroundColor = "rgba(39, 174, 96, 0.9)";
 playerHpBoard.style.color = "#fff";
 playerHpBoard.style.padding = "10px 20px";
@@ -185,11 +200,11 @@ playerHpBoard.style.textAlign = "center";
 playerHpBoard.style.zIndex = "10";
 
 playerHpBoard.innerHTML = `
+    
     <div style="font-size: 0.9em; font-weight: bold; margin-bottom: 3px; text-shadow: 1px 1px 0 #000;">🧑 あなたのHP</div>
     <div style="font-size: 1.8em; font-weight: bold; text-shadow: 2px 2px 0 #000;"><span id="playerHpDisplay">10 / 10</span></div>
 `;
 document.querySelector('.game-container').appendChild(playerHpBoard);
-
 // =========================================
 // ★復活：訓練場UIの動的生成（これが消えちゃってました！）
 // =========================================
@@ -457,12 +472,37 @@ function updateTurnDisplay() {
     else { displayElement.style.backgroundColor = "#000"; displayElement.style.color = "#e74c3c"; }
 }
 
-function setRandomBaseProb() {
+// =========================================
+// ★新規・差し替え：敵の個性（思考ルーチン）処理
+// =========================================
+function updateEnemyBehavior(playerLastHand) {
     let data = stageData.at(currentStage - 1);
-    let pattern = Array.from(data.probPattern);
-    for (let i = pattern.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); let temp = pattern.at(i); pattern[i] = pattern.at(j); pattern[j] = temp; }
-    baseEnemyProb = { "グー": pattern.at(0), "チョキ": pattern.at(1), "パー": pattern.at(2) };
-    enemyProb = { ...baseEnemyProb }; updateProbDisplay();
+    
+    if (currentEnemyBehavior === "random") {
+        // スライム：完全に3等分
+        baseEnemyProb = { "グー": 33, "チョキ": 33, "パー": 34 };
+    } 
+    else if (currentEnemyBehavior === "rock") {
+        // オーク：常にグーが70%
+        baseEnemyProb = { "グー": 70, "チョキ": 15, "パー": 15 };
+    } 
+    else if (currentEnemyBehavior === "counter" && playerLastHand && playerLastHand !== "start") {
+        // トリックスター：プレイヤーの「前回の手」に勝つ手を高確率で選ぶ！
+        baseEnemyProb = { "グー": 10, "チョキ": 10, "パー": 10 };
+        if (playerLastHand === "グー" || playerLastHand === "グチョ") baseEnemyProb["パー"] = 80;
+        else if (playerLastHand === "チョキ" || playerLastHand === "チョパ") baseEnemyProb["グー"] = 80;
+        else if (playerLastHand === "パー" || playerLastHand === "グパ") baseEnemyProb["チョキ"] = 80;
+        else baseEnemyProb = { "グー": 33, "チョキ": 33, "パー": 34 };
+    } 
+    else {
+        // ゴブリン等（ノーマル）：今まで通り、ステージの確率をシャッフル
+        let pattern = Array.from(data.probPattern);
+        for (let i = pattern.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); let temp = pattern.at(i); pattern[i] = pattern.at(j); pattern[j] = temp; }
+        baseEnemyProb = { "グー": pattern.at(0), "チョキ": pattern.at(1), "パー": pattern.at(2) };
+    }
+    
+    enemyProb = { ...baseEnemyProb }; 
+    updateProbDisplay();
 }
 
 function showRewardScreen() {
@@ -725,44 +765,62 @@ function openRemoveModal() {
 }
 function closeRemoveModal() { document.getElementById("removeModal").style.display = "none"; }
 
+// =========================================
+// ★大幅修正：バトル開始時の敵抽選とUI反映
+// =========================================
 function startEncounter(type) {
     currentEnemyType = type;
     document.getElementById("routeScreen").style.display = "none";
     document.getElementById("shopScreen").style.display = "none";
     document.getElementById("rewardScreen").style.display = "none";
     document.getElementById("eliteRewardScreen").style.display = "none";
-    document.getElementById("trainingScreen").style.display = "none"; // 訓練場も隠す
+    document.getElementById("trainingScreen").style.display = "none"; 
     document.getElementById("battleScreen").style.display = "block";
     
     let data = stageData.at(currentStage - 1);
-    enemyLife = data.hp;
-    if (type === "elite") { enemyLife = Math.floor(enemyLife * 1.5); }
+    let baseHp = data.hp;
+    
+    // ★敵の抽選！
+    let template;
+    if (type === "boss") {
+        template = { name: "魔王", icon: "👑", hpMod: 1.0, dmg: 3, type: "normal" };
+        baseHp = 100;
+    } else if (type === "elite") {
+        template = { name: "エリート騎士", icon: "💀", hpMod: 1.5, dmg: 2, type: "normal" };
+    } else {
+        // 通常の敵をリストからランダムに選ぶ
+        template = enemyList[Math.floor(Math.random() * enemyList.length)];
+    }
+    
+    // 敵のステータスを現在の敵としてセット
+    currentEnemyName = template.name;
+    currentEnemyIcon = template.icon;
+    currentEnemyDamage = template.dmg;
+    currentEnemyBehavior = template.type;
+
+    enemyLife = Math.floor(baseHp * template.hpMod);
     enemyMaxLife = enemyLife; 
     
     damageMultipliers = { "グー": 1, "チョキ": 1, "パー": 1, "all": 1 };
-    
-    // ★フラグ初期化（虚弱やロウワーも）
     turnFlags = { healOnKill: null, goldMultiplier: 1, lowerUsed: false, lowerMultiplier: 1.2 };
     durationBuffs = { bonusDamage: 0, turnsLeft: 0 };
-    turnCount = 0; 
+    turnCount = 0; turnBaseAttackBonus = 0; lockProbability = false; poisonCountdown = 0; enemyWeakCountdown = 0;
     
-    turnBaseAttackBonus = 0;
-    lockProbability = false;
-    poisonCountdown = 0;
-    enemyWeakCountdown = 0;
-    
-    playedCardsThisTurn = new Array();
-    updateHistoryUI();
-    updateDamagePreview();
-    updateGoldDisplay();
+    playedCardsThisTurn = new Array(); updateHistoryUI(); updateDamagePreview(); updateGoldDisplay();
+
+    // ★敵のHPボードの名前と攻撃力を書き換える
+    let eBoard = document.getElementById("enemyHpBoard");
+    if(eBoard) {
+        eBoard.firstElementChild.innerHTML = `${currentEnemyIcon} ${currentEnemyName} <span style="font-size:0.75em; color:#f39c12;">(攻撃力: ${currentEnemyDamage})</span>`;
+    }
 
     let stageName = "🚩 ステージ " + currentStage;
     if (type === "boss") stageName = "👑 最終ボス (Stage 11)";
     else if (type === "elite") stageName = "💀 強敵 (Stage " + currentStage + ")";
-
     document.getElementById("stageDisplay").innerText = stageName;
     
-    setRandomBaseProb(); updateLifeDisplay(); updateTurnDisplay();
+    updateEnemyBehavior("start"); // 初回の敵の確率をセット
+    updateLifeDisplay(); updateTurnDisplay();
     document.getElementById("btnRock").disabled = false; document.getElementById("btnScissors").disabled = false; document.getElementById("btnPaper").disabled = false;
 }
 
@@ -1029,7 +1087,12 @@ function playGame(playerHand) {
             } else if (isTie === true) {
                 se.tie(); showPopup("tie", "DRAW", detailText);
             } else {
-                playerLife--; se.lose(); showPopup("lose", "LOSE...", detailText); container.classList.add('shake'); setTimeout(() => { container.classList.remove('shake'); }, 500);
+               // ★修正：敵の攻撃力分ダメージを受ける＆自分にポップアップ！
+                playerLife -= currentEnemyDamage; 
+                se.lose(); showPopup("lose", "LOSE...", detailText); 
+                container.classList.add('shake'); 
+                spawnDamageEffect(currentEnemyDamage, true); // isPlayer=trueで自分側に数字が出る
+                setTimeout(() => { container.classList.remove('shake'); }, 500);
             }
 
             updateLifeDisplay();
@@ -1109,14 +1172,18 @@ function playGame(playerHand) {
             }
             
             playedCardsThisTurn = new Array(); updateHistoryUI(); updateDamagePreview(); updateTurnDisplay();
-            setRandomBaseProb(); drawCards(turnDrawCount);
             
+            
+            // ★修正：プレイヤーの出した手を渡して、次のターンの敵のAIを計算させる
+            updateEnemyBehavior(playerHand); 
+            drawCards(turnDrawCount);
+
             // ターン終了時にロック解除
             isBattleAnimating = false;
 
-        }, 400); // ここが0.08秒（80ms）のタメ！！！
+        }, 400); // ここが0.4秒（400ms）のタメ！！！
 
-    }, 600); // ここが0.4秒のタメ！！！
+    }, 600); // ここが0.6秒のタメ！！！
 }
 
 function disableButtons() {
